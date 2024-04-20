@@ -87,7 +87,7 @@ def naive_associative_rnn_scan(x: torch.Tensor, a: torch.Tensor) -> torch.Tensor
 if __name__ == "__main__":
     _batch, _seq_len, _dim = 100, 256, 256 * 20
 
-    test_x = torch.randn(_batch, _seq_len, _dim).cuda()
-    test_a = torch.randn(_batch, _seq_len, _dim).cuda()
+    test_x = torch.randn(_batch, _seq_len, _dim, dtype=torch.float32).cuda()
+    test_a = torch.randn(_batch, _seq_len, _dim, dtype=torch.float32).cuda()
 
     assert torch.allclose(naive_associative_rnn_scan(test_x, test_a), rnn_scan_ref(test_x, test_a), atol=0.125, rtol=0)

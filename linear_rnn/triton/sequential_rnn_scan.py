@@ -102,7 +102,7 @@ def rnn_scan_ref(x: torch.Tensor, a: torch.Tensor, h0: torch.Tensor | None = Non
 if __name__ == "__main__":
     _batch, _seq_len, _dim = 100, 1024, 256 * 20
 
-    test_x = torch.randn(_batch, _seq_len, _dim).cuda()
-    test_a = torch.randn(_batch, _seq_len, _dim).cuda()
+    test_x = torch.randn(_batch, _seq_len, _dim, dtype=torch.float32).cuda()
+    test_a = torch.randn(_batch, _seq_len, _dim, dtype=torch.float32).cuda()
 
     assert torch.allclose(sequential_rnn_scan(test_x, test_a), rnn_scan_ref(test_x, test_a), atol=0.125, rtol=0)

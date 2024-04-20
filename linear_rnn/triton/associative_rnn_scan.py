@@ -72,10 +72,10 @@ def associative_rnn_scan(x: torch.Tensor, a: torch.Tensor) -> torch.Tensor:
     assert dim % BLOCK_SIZE_DIM == 0, f"{dim=} is not a multiple of {BLOCK_SIZE_DIM=}"
     assert x.shape == a.shape
 
-    out = torch.zeros_like(x)
-    cum_a = torch.zeros_like(x)
+    out = torch.empty_like(x)
+    cum_a = torch.empty_like(x)
 
-    num_iters = int(triton.cdiv(math.log2(out.shape[1]), math.log2(BLOCK_SIZE_LEN)))
+    num_iters = triton.cdiv(int(math.log2(out.shape[1])), int(math.log2(BLOCK_SIZE_LEN)))
     for iter_id in range(num_iters):
         grid = lambda META: (
             batch,
@@ -113,7 +113,7 @@ def associative_rnn_scan(x: torch.Tensor, a: torch.Tensor) -> torch.Tensor:
 if __name__ == "__main__":
     _batch, _seq_len, _dim = 100, 1024, 256 * 100
 
-    test_x = torch.randn(_batch, _seq_len, _dim).cuda()
-    test_a = torch.randn(_batch, _seq_len, _dim).cuda()
+    test_x = torch.randn(_batch, _seq_len, _dim, dtype=torch.float32).cuda()
+    test_a = torch.randn(_batch, _seq_len, _dim, dtype=torch.float32).cuda()
 
     assert torch.allclose(associative_rnn_scan(test_x, test_a), rnn_scan_ref(test_x, test_a), atol=0.125, rtol=0)
