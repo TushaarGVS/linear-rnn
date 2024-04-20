@@ -9,7 +9,7 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.10"
-torch = "^2.2.2"
+torch = "^2.0.1"
 matplotlib = "^3.8.4"
 triton = { git = "https://github.com/openai/triton.git", subdirectory = "python" }
 numpy = "^1.26.4"
