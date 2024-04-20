@@ -31,7 +31,8 @@ To benchmark the RNN scan, run:
 cd $HOME/linear-rnn; python linear_rnn/benchmarking/rnn_scan.py
 ```
 
-The RNN scan benchmarking results (from running on an A6000 GPU) for sequences of length $32$ to $131$K (batch size $4$,
-dim: $5,120$) are recorded in `linear_rnn/benchmarking/results/rnn_scan`:
+The RNN scan benchmarking results (from running on an A6000 GPU) for sequences of length 32 to 131K (batch size: 4, dim:
+5,120) are recorded in
+[`linear_rnn/benchmarking/results/rnn_scan`](https://github.com/TushaarGVS/linear-rnn/blob/main/linear_rnn/benchmarking/results/rnn_scan):
 
 ![rnn_scan_benchmark.png](linear_rnn/benchmarking/results/rnn_scan/rnn_scan_performance.png)
