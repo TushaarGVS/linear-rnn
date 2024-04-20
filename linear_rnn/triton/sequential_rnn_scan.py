@@ -1,3 +1,4 @@
+import math
 import torch
 import triton
 import triton.language as tl
@@ -38,7 +39,7 @@ def _sequential_rnn_scan_fwd_kernel(
     ht_ptrs = ht_ptr + offsets * stride_h0_dim
     out_ptrs = out_ptr + offsets * stride_out_dim
 
-    h_t = tl.load(ht_ptrs).to(tl.float32)
+    h_t = tl.load(ht_ptrs).to(tl.float32)  # load to SRAM
     for t in range(seq_len):
         x_t = tl.load(x_ptrs).to(tl.float32)
         a_t = tl.load(a_ptrs).to(tl.float32)
@@ -49,7 +50,7 @@ def _sequential_rnn_scan_fwd_kernel(
             x_ptrs += stride_x_len
             a_ptrs += stride_a_len
 
-    tl.store(out_ptrs, h_t.to(out_ptr.dtype.element_ty))
+    tl.store(out_ptrs, h_t.to(out_ptr.dtype.element_ty))  # write back to HBM/DRAM
 
 
 @triton.jit
@@ -61,6 +62,7 @@ def sequential_rnn_scan(x: torch.Tensor, a: torch.Tensor, h0: torch.Tensor | Non
     BLOCK_SIZE, num_warps = 256, 16  # TODO: change later to autotune
 
     batch, seq_len, dim = x.shape
+    assert math.floor(math.log2(batch)) == math.ceil(math.log2(batch)), f"{batch=} must be a power of 2"
     assert dim % BLOCK_SIZE == 0, f"{dim=} is not a multiple of {BLOCK_SIZE=}"
     assert x.shape == a.shape
     assert h0 is None or h0.shape == (batch, dim)

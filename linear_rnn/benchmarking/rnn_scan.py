@@ -9,7 +9,7 @@ from linear_rnn.triton.sequential_rnn_scan import sequential_rnn_scan, rnn_scan_
     [
         triton.testing.Benchmark(
             x_names=["seq_len"],
-            x_vals=[2**i for i in range(5, 17, 1)],
+            x_vals=[int(2**i) for i in range(5, 18, 1)],
             x_log=True,
             y_log=True,
             line_arg="benchmark_fn",
@@ -18,13 +18,13 @@ from linear_rnn.triton.sequential_rnn_scan import sequential_rnn_scan, rnn_scan_
             styles=[("blue", "-"), ("green", "--"), ("green", "-")],
             ylabel="ms",
             plot_name="rnn_scan_performance",
-            args={"batch": 8, "dim": 2560},
+            args={"batch": 4, "dim": 5120},
         )
     ]
 )
 def benchmark(batch: int, seq_len: int, dim: int, benchmark_fn: str):
-    x = torch.randn(batch, seq_len, dim, device="cuda", dtype=torch.float32)
-    a = torch.randn(batch, seq_len, dim, device="cuda", dtype=torch.float32)
+    x = torch.randn(batch, seq_len, dim, device="cuda", dtype=torch.float16)
+    a = torch.randn(batch, seq_len, dim, device="cuda", dtype=torch.float16)
 
     quantiles = [0.5, 0.2, 0.8]
     if benchmark_fn == "rnn_scan_ref":

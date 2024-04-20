@@ -68,6 +68,7 @@ def associative_rnn_scan(x: torch.Tensor, a: torch.Tensor) -> torch.Tensor:
     BLOCK_SIZE_LEN, BLOCK_SIZE_DIM, num_warps = 32, 256, 16  # TODO: change later to autotune
 
     batch, seq_len, dim = x.shape
+    assert math.floor(math.log2(batch)) == math.ceil(math.log2(batch)), f"{batch=} must be a power of 2"
     assert seq_len % BLOCK_SIZE_LEN == 0, f"{seq_len=} is not a multiple of {BLOCK_SIZE_LEN=}"
     assert dim % BLOCK_SIZE_DIM == 0, f"{dim=} is not a multiple of {BLOCK_SIZE_DIM=}"
     assert x.shape == a.shape

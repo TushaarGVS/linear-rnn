@@ -1,3 +1,4 @@
+import math
 import torch
 import triton
 import triton.language as tl
@@ -58,6 +59,7 @@ def naive_associative_rnn_scan(x: torch.Tensor, a: torch.Tensor) -> torch.Tensor
     BLOCK_SIZE, num_warps = 256, 16  # TODO: change later to autotune
 
     batch, seq_len, dim = x.shape
+    assert math.floor(math.log2(batch)) == math.ceil(math.log2(batch)), f"{batch=} must be a power of 2"
     assert dim % BLOCK_SIZE == 0, f"{dim=} is not a multiple of {BLOCK_SIZE=}"
     assert x.shape == a.shape
 
