@@ -54,7 +54,6 @@ def _sequential_scan_diag_a_fwd_kernel(
         a_t = tl.load(a_ptrs).to(tl.float32)
 
         h_t = a_t * h_t + x_t
-        tl.store(out_ptrs, h_t.to(out_ptrs.dtype.element_ty))  # SRAM to HBM
 
         # Advance all ptrs to the next element in the sequence.
         if t < seq_len - 1:
@@ -62,25 +61,30 @@ def _sequential_scan_diag_a_fwd_kernel(
             a_ptrs += stride_a_len
             out_ptrs += stride_out_len
 
+    # Write the final hidden state from SRAM to HBM.
+    tl.store(out_ptrs, h_t.to(out_ptrs.dtype.element_ty))
+
 
 class SequentialScanDiagA(torch.autograd.Function):
+    """Sequential scan (with diagonal A), parallelized across "dim" dimension."""
+
     @staticmethod
     @torch.cuda.amp.custom_fwd
     def forward(ctx: Any, x: torch.Tensor, a: torch.Tensor) -> torch.Tensor:
-        """Sequential scan (with diagonal A), parallelized across "dim" dimension."""
         batch, seq_len, dim = x.shape
 
         # Set num_warps based on BLOCK_SIZE: (BLOCK_SIZE // 32) indicates the number of
         # warps to process the entire block in one go.
         BLOCK_SIZE = 512
         num_warps = min(max(BLOCK_SIZE // 32, 1), 16)
+        print(f"elements_per_block={BLOCK_SIZE}, threads_per_block={num_warps * 32}")
 
         assert dim % BLOCK_SIZE == 0, f"{dim=} must be a multiple of {BLOCK_SIZE=}"
         assert x.shape == a.shape
         assert is_power_of_2(BLOCK_SIZE), f"{BLOCK_SIZE=} must be a power of two"
 
         # Do not initialize h_0 here, directly create it on SRAM.
-        out = torch.empty_like(x)
+        out = torch.empty_like(x[:, 0])
 
         # Grid: (batch, dim/BLOCK_SIZE) blocks, with BLOCK_SIZE elements per block.
         grid = lambda META: (batch, triton.cdiv(dim, META["BLOCK_SIZE"]))
