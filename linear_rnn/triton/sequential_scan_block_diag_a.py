@@ -22,7 +22,7 @@ def _sequential_scan_block_diag_a_bwd_kernel():
 
 
 class SequentialScanBlockDiagA(torch.autograd.Function):
-    """Sequential scan (with block-diagonal A), parallelized across "dim" dimension."""
+    """Sequential scan (with block-diagonal A), parallelized across "num_blocks" and "dim" dimensions."""
 
     @staticmethod
     @torch.cuda.amp.custom_fwd

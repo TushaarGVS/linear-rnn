@@ -108,6 +108,9 @@ class AssociativeScanDiagA(torch.autograd.Function):
         acc_a = torch.empty_like(x)
         out = torch.empty_like(x)
 
+        # Think: with BLOCK_SIZE_LEN=2, we need log2(seq_len) total runs, with BLOCK_SIZE_LEN=4, we only need
+        # log2(seq_len) / 2 runs, with BLOCK_SIZE_LEN=8, we only need log2(seq_len) / 3 runs, and so on. It helps to
+        # draw out an execution tree.
         num_iters = math.ceil(math.log2(out.shape[1]) / math.log2(BLOCK_SIZE_LEN))
         for iter_idx in range(num_iters):
             # Grid: (batch, seq_len/BLOCK_SIZE_LEN, dim/BLOCK_SIZE_DIM)
@@ -150,11 +153,14 @@ class AssociativeScanDiagA(torch.autograd.Function):
 if __name__ == "__main__":
     from linear_rnn.reference.scan import scan_diag_a_ref
 
-    _batch, _seq_len, _dim = 64, 1024, 256 * 100
+    _batch, _seq_len, _dim = 64, 2048, 256 * 50
 
     test_x = torch.randn(_batch, _seq_len, _dim, dtype=torch.float32).cuda()
     test_a = torch.randn(_batch, _seq_len, _dim, dtype=torch.float32).cuda()
 
+    # elements_per_block = 8192, threads_per_block = 1024
+    # max_abs_err = 0.12103271484375
     test_ref_out = scan_diag_a_ref(test_x, test_a)
     test_out = AssociativeScanDiagA.apply(test_x, test_a)
     assert torch.allclose(test_ref_out, test_out, atol=0.125, rtol=0)
+    print(f"max_abs_err={torch.max(torch.abs(test_ref_out - test_out))}")

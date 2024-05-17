@@ -25,7 +25,6 @@ def _sequential_scan_diag_a_fwd_kernel(
     stride_a_len,
     stride_a_dim,
     stride_out_batch,
-    stride_out_len,
     stride_out_dim,
     seq_len: tl.constexpr,
     BLOCK_SIZE: tl.constexpr,
@@ -53,13 +52,12 @@ def _sequential_scan_diag_a_fwd_kernel(
         x_t = tl.load(x_ptrs).to(tl.float32)
         a_t = tl.load(a_ptrs).to(tl.float32)
 
-        h_t = a_t * h_t + x_t
+        h_t = tl.fma(a_t, h_t, x_t)
 
         # Advance all ptrs to the next element in the sequence.
         if t < seq_len - 1:
             x_ptrs += stride_x_len
             a_ptrs += stride_a_len
-            out_ptrs += stride_out_len
 
     # Write the final hidden state from SRAM to HBM.
     tl.store(out_ptrs, h_t.to(out_ptrs.dtype.element_ty))
@@ -99,8 +97,7 @@ class SequentialScanDiagA(torch.autograd.Function):
             stride_a_len=a.stride(1),
             stride_a_dim=a.stride(2),
             stride_out_batch=out.stride(0),
-            stride_out_len=out.stride(1),
-            stride_out_dim=out.stride(2),
+            stride_out_dim=out.stride(1),
             seq_len=seq_len,
             BLOCK_SIZE=BLOCK_SIZE,
             num_warps=num_warps,
@@ -116,11 +113,14 @@ class SequentialScanDiagA(torch.autograd.Function):
 if __name__ == "__main__":
     from linear_rnn.reference.scan import scan_diag_a_ref
 
-    _batch, _seq_len, _dim = 32, 1024, 256 * 20
+    _batch, _seq_len, _dim = 64, 2048, 256 * 50
 
     test_x = torch.randn(_batch, _seq_len, _dim, dtype=torch.float32).cuda()
     test_a = torch.randn(_batch, _seq_len, _dim, dtype=torch.float32).cuda()
 
+    # elements_per_block = 512, threads_per_block = 512
+    # max_abs_err = 0.000244140625
     test_ref_out = scan_diag_a_ref(test_x, test_a)
     test_out = SequentialScanDiagA.apply(test_x, test_a)
     assert torch.allclose(test_ref_out, test_out, atol=0.125, rtol=0)
+    print(f"max_abs_err={torch.max(torch.abs(test_ref_out - test_out))}")
