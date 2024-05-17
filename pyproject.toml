@@ -11,7 +11,7 @@ readme = "README.md"
 python = "^3.10"
 torch = "^2.0.1"
 matplotlib = "^3.8.4"
-triton = { git = "https://github.com/openai/triton.git", subdirectory = "python" }
+triton = "^2.2.0"
 numpy = "^1.26.4"
 nvtx = "^0.2.10"
 jupyterlab-nvidia-nsight = "^0.5.2"

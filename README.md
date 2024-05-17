@@ -6,20 +6,19 @@ The repository uses [Poetry](https://python-poetry.org/docs/) to manage dependen
 entire package, run:
 
 ```shell
+conda create -n linear-rnn-env python=3.10
+conda activate linear-rnn-env
+# conda install -c "nvidia/label/cuda-12.4.0" cuda-toolkit
+
 cd $HOME; git clone https://github.com/TushaarGVS/linear-rnn.git
 cd $HOME/linear-rnn
-
-poetry install
 ```
 
-To run the package in an editable mode, run:
+To install and run the package in an editable mode, run:
 
 ```shell
 pip install -e .
 ```
-
-__Note.__ The pacakge uses `triton-3.0.0` which needs to be installed from source (and is also not compatible with
-`torch=2.2.2`).
 
 ---
 
