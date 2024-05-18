@@ -39,8 +39,8 @@ def _sequential_scan_diag_a_fwd_kernel(
     a_ptr += pid_batch * stride_a_batch
     out_ptr += pid_batch * stride_out_batch
 
-    # Within the batch, move to the right block start. Note: all the ptrs currently
-    # point to the first element in the sequence.
+    # Within the batch, move to the right block start. Note: all the ptrs currently point to the first element in the
+    # sequence.
     offsets = pid_dim * BLOCK_SIZE + tl.arange(0, BLOCK_SIZE)
     x_ptrs = x_ptr + offsets * stride_x_dim
     a_ptrs = a_ptr + offsets * stride_a_dim
@@ -71,8 +71,8 @@ class SequentialScanDiagA(torch.autograd.Function):
     def forward(ctx: Any, x: torch.Tensor, a: torch.Tensor) -> torch.Tensor:
         batch, seq_len, dim = x.shape
 
-        # Set num_warps based on BLOCK_SIZE: (BLOCK_SIZE // 32) indicates the number of
-        # warps to process the entire block in one go.
+        # Set num_warps based on BLOCK_SIZE: (BLOCK_SIZE // 32) indicates the number of warps to process the entire
+        # block in one go.
         BLOCK_SIZE = 512
         num_warps = min(max(BLOCK_SIZE // 32, 1), 16)
         print(f"elements_per_block={BLOCK_SIZE}, threads_per_block={num_warps * 32}")
