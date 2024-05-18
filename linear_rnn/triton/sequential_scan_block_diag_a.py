@@ -32,20 +32,16 @@ def _sequential_scan_block_diag_a_fwd_kernel(
     BLOCK_SIZE_N: tl.constexpr,
 ):
     """Sequential scan (with block-diagonal A) forward kernel, process BLOCK_SIZE_DIM (x) elements."""
-    # Grid: (batch, num_blocks, dim/BLOCK_SIZE_M)
+    # Grid: (batch, num_blocks, block_dim/BLOCK_SIZE_M)
     pid_batch = tl.program_id(0)
     pid_block = tl.program_id(1)
     pid_dim_m = tl.program_id(2)
 
     # Move all ptrs to the correct batch, then the right block. We don't need to offset across seq_len dimension,
     # since we're running a sequential scan; we will offset by stride_*_len while looping over timesteps.
-    x_ptr += pid_batch * stride_x_batch + pid_block * stride_x_block  # x: (batch, seq_len, num_blocks, m=block_dim)
-    a_ptr += (
-        pid_batch * stride_a_batch + pid_block * stride_a_block
-    )  # a: (batch, seq_len, num_blocks, m=block_dim, n=block_dim)
-    out_ptr += (
-        pid_batch * stride_out_batch + pid_block * stride_out_block
-    )  # out: (batch, seq_len, num_blocks, m=block_dim)
+    x_ptr += pid_batch * stride_x_batch + pid_block * stride_x_block  # x: (b, L, num_blocks, m=block_dim)
+    a_ptr += pid_batch * stride_a_batch + pid_block * stride_a_block  # a: (b, L, num_blocks, m=block_dim, n=block_dim)
+    out_ptr += pid_batch * stride_out_batch + pid_block * stride_out_block  # out: (b, L, num_blocks, m=block_dim)
 
     # Create 1D ptrs for x and out, each of size: BLOCK_SIZE_M.
     offsets_dim_m = pid_dim_m * BLOCK_SIZE_M + tl.arange(0, BLOCK_SIZE_M)
@@ -56,6 +52,9 @@ def _sequential_scan_block_diag_a_fwd_kernel(
     offsets_dim_n = tl.arange(0, BLOCK_SIZE_N)
     a_ptrs = a_ptr + offsets_dim_m[:, None] * stride_a_dim_m + offsets_dim_n[None, :] * stride_a_dim_n
 
+    # Create 1D ptrs to point to the first BLOCK_SIZE_N of the previous hidden state (= out_ptr).
+    prev_ht_ptrs = out_ptr + offsets_dim_n
+
     for t in range(seq_len):
         # Move through one BLOCK_SIZE_N at a time and accumulate the result (matrix-vector multiplication) in acc; see
         # https://github.com/openai/triton/issues/375#issuecomment-1441180533.
@@ -65,7 +64,7 @@ def _sequential_scan_block_diag_a_fwd_kernel(
             prev_ht = (
                 tl.zeros([BLOCK_SIZE_N], dtype=tl.float32)
                 if t == 0
-                else tl.load(out_ptrs - stride_out_len + n * BLOCK_SIZE_N * stride_out_dim_m).to(tl.float32)
+                else tl.load(prev_ht_ptrs + n * BLOCK_SIZE_N * stride_out_dim_m).to(tl.float32)
             )
             acc += tl.sum(a_t * prev_ht[:, None], axis=1, keep_dims=False)  # accumulate sum along axis-n
 
@@ -76,6 +75,8 @@ def _sequential_scan_block_diag_a_fwd_kernel(
         # Advance all ptrs to point to the next element in the sequence.
         x_ptrs += stride_x_len
         a_ptrs += stride_a_len
+        if t > 0:
+            prev_ht_ptrs += stride_out_len
         out_ptrs += stride_out_len
 
 
@@ -92,16 +93,13 @@ class SequentialScanBlockDiagA(torch.autograd.Function):
     @torch.cuda.amp.custom_fwd
     def forward(ctx: Any, x: torch.Tensor, a: torch.Tensor) -> torch.Tensor:
         batch, seq_len, dim = x.shape
-        num_blocks, block_dim = (
-            a.shape[-3],
-            a.shape[-1],
-        )  # a: (batch, seq_len, num_blocks, block_dim, block_dim)
+        num_blocks, block_dim = (a.shape[-3], a.shape[-1])  # a: (batch, seq_len, num_blocks, block_dim, block_dim)
 
         BLOCK_SIZE = 512
         num_warps = min(max(BLOCK_SIZE // 32, 1), 16)
         print(f"x_elements_per_block={BLOCK_SIZE}, threads_per_block={num_warps * 32}")
 
-        assert dim % BLOCK_SIZE == 0
+        assert block_dim % BLOCK_SIZE == 0
         assert dim == num_blocks * block_dim, f"{(num_blocks * block_dim)=} mismatches with {dim=}"
         assert is_power_of_2(BLOCK_SIZE), f"{BLOCK_SIZE=} must be a power of two"
 
@@ -109,11 +107,7 @@ class SequentialScanBlockDiagA(torch.autograd.Function):
         out = torch.empty_like(x)  # (batch, seq_len, num_blocks, block_dim)
 
         # a_t@h_t + x_t: (BLOCK_SIZE_M, BLOCK_SIZE_N)@BLOCK_SIZE_N + BLOCK_SIZE_M.
-        grid = lambda META: (
-            batch,
-            num_blocks,
-            triton.cdiv(dim, META["BLOCK_SIZE_M"]),
-        )
+        grid = lambda META: (batch, num_blocks, triton.cdiv(block_dim, META["BLOCK_SIZE_M"]))
         _sequential_scan_block_diag_a_fwd_kernel[grid](
             x_ptr=x,
             a_ptr=a,
