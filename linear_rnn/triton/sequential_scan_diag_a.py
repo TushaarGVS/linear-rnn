@@ -122,5 +122,5 @@ if __name__ == "__main__":
     # max_abs_err = 0.000244140625
     test_ref_out = scan_diag_a_ref(test_x, test_a)
     test_out = SequentialScanDiagA.apply(test_x, test_a)
-    assert torch.allclose(test_ref_out, test_out, atol=0.125, rtol=0)
     print(f"max_abs_err={torch.max(torch.abs(test_ref_out - test_out))}")
+    assert torch.allclose(test_ref_out, test_out, atol=0.125, rtol=0)
